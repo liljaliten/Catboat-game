@@ -1,19 +1,26 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Unity.VisualScripting.Member;
 
 public class FishingMiniGame : MonoBehaviour
 {
-
+ 
+    [Tooltip("Important Transforms")]
     [SerializeField] Transform topPiv;
     [SerializeField] Transform bottomPiv;
     [SerializeField] Transform fish;
-
-    [SerializeField] float timeMult = 3.0f;
-    [SerializeField] float smoothMotion = 1.0f;
-
     [SerializeField] Transform hook;
+
+
+    [Tooltip("Fish Movement")]
+    [SerializeField] float timeMult = 3.0f; //fishMovement fishdata
+    [SerializeField] float smoothMotion = 1.0f; // fishSpeed fishdata
+
+    [Tooltip("Hook")]
     [SerializeField] float hookSize = 0.1f;
     [SerializeField] float hookPower = 0.5f;
     [SerializeField] float hookPullPW = 0.01f;
@@ -25,6 +32,8 @@ public class FishingMiniGame : MonoBehaviour
 
     [SerializeField] float failtTime = 10.0f;
 
+    GameObject baitReference;
+
     float fishPos;
     float fishDir;
     float fishSpeed;
@@ -35,10 +44,20 @@ public class FishingMiniGame : MonoBehaviour
     float hookPullVel;
 
     bool pause = false;
+    bool isCasted;
+    bool isPulling;
+
+    FishArea fishArea;
 
     private void Start()
     {
         Resize();
+        fishArea = FindObjectOfType<FishArea>();
+        WaterSource source = fishArea.waterSource;
+
+
+        //behöver hitta source någonstans?
+        StartFishingMini(source);
     }
 
    
@@ -46,11 +65,29 @@ public class FishingMiniGame : MonoBehaviour
     private void Update()
     {
 
+
         if (pause) { return; }
 
         Fish();
         Hook();
         ProgressCheck();
+
+    }
+
+    internal void SetDifficulty(FishData fishBiting) // behöver hjälp med denna ifall man kan bara sätta in värdena istället eller ifall det är lättare o göra en switch
+    {
+        switch(fishBiting.fishDifficulty)
+        {
+            case 1:
+                timeMult = 1;
+                return;
+            case 2:
+                timeMult = 2;
+                return;
+            case 3:
+                timeMult = 3;
+                return;
+        }
     }
 
     void Resize()
@@ -106,6 +143,31 @@ public class FishingMiniGame : MonoBehaviour
         hook.position = Vector3.Lerp(bottomPiv.position,topPiv.position, hookPos);
     }
 
+    void StartFishingMini(WaterSource source)
+    {
+
+
+        if (Input.GetMouseButton(0) && !isCasted && isPulling)
+        {
+            //hämtar vilket vatten det är i start
+            FishingSystem.Instance.StartFishing(source);
+
+        }
+
+             // ifall spelaren trycker 0 ska den dra upp fisken ifall den fiskar
+             // if(isCatsed && input.getmousebutton(0) && fishingsystem.instance.isthereabite)
+
+            //Fishingame active ^^^ den övre ska trigga den undre
+            //FishingSystem.Instance.PlayerFishing(); <<------ triggar data till minigame
+            //pause = false;
+
+        if (FishingSystem.Instance.isThereABite)
+        {
+            //alert
+            baitReference.transform.Find("Alert").gameObject.SetActive(true);  
+        }
+
+    }
     void ProgressCheck()
     {
         Vector3 ls = ProgressBarContainer.localScale;
@@ -125,7 +187,7 @@ public class FishingMiniGame : MonoBehaviour
             hookProgress -= hookProgressDegradationPW * Time.deltaTime;
 
             failtTime -= Time.deltaTime;
-            if(failtTime <0f)
+            if(failtTime < 0f)
             {
                 Lose();
             }
@@ -142,14 +204,40 @@ public class FishingMiniGame : MonoBehaviour
 
     void Win()
     {
+
+        FishingSystem.Instance.EndMinigame(true); //UI Popup kopplas i fishingsystem (kanske)
+
         pause = true;
         Debug.Log("You Catched Fish!");
+
+        hookProgress = 0f;  
+        
     }
 
     void Lose()
     {
+        FishingSystem.Instance.EndMinigame(false);
+
         pause = true;
         Debug.Log("Womp Womp, You Lost The Fish");
+
+        hookProgress = 0f;
+    }
+
+    private void OnEnable()
+    {
+        FishingSystem.OnFishingEnd += HandleFishinEnd;
+    }
+
+    private void OnDestroy()
+    {
+        FishingSystem.OnFishingEnd -= HandleFishinEnd;
+    }
+
+    public void HandleFishinEnd()
+    {
+        //invokar att bait är i vattnet?+
+        Destroy(baitReference); //kolla här , i tutorial så vill man ta död på bait, det ska inte jag så behöver it detta fr
     }
 
 }
